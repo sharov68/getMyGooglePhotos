@@ -2,3 +2,4 @@ node_modules
 local-config.js
 package-lock.json
 client_secret*.json
+GooglePhotosBackup/*
