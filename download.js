@@ -51,7 +51,7 @@ async function downloadMedia(mediaItems) {
     await fs.ensureDir(DOWNLOAD_FOLDER);
     const spinner = ora("Скачивание фото...").start();
     for (const item of mediaItems) {
-        console.log(item.mediaMetadata);
+        //console.log(item.mediaMetadata);
         const url = `${item.baseUrl}=d`; // Полный размер
         const filename = `${DOWNLOAD_FOLDER}/${item.filename}`;
         const response = await axios.get(url, { responseType: "stream" });
