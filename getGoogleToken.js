@@ -4,7 +4,10 @@ if (_.isEmpty(_client_secret)) {
     console.log("No credentials");
     process.exit(0);
 }
-const { client_id, client_secret } = _client_secret.installed;
+// proporty name inside of _client_secret dependence from app type in your Google development console.
+// for example, type "Web Application" _client_secret.web
+// In future need to collect all properties
+const { client_id, client_secret } = _client_secret.installed ? _client_secret.installed : _client_secret.web;
 const fs = require("fs-extra");
 const { google } = require("googleapis");
 const open = require("open");
