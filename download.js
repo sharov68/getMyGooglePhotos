@@ -1,83 +1,70 @@
 const _ = require("lodash");
-const client_secret = require("./client_secret");
-
-if (_.isEmpty(client_secret)) {
+const _client_secret = require("./client_secret");
+if (_.isEmpty(_client_secret)) {
     console.log("No credentials");
     process.exit(0);
 }
-
+const { client_id, client_secret } = _client_secret.installed;
 const fs = require("fs-extra");
 const { google } = require("googleapis");
-const open = require("open");
+const Photos = require('googlephotos');
 const axios = require("axios");
 const ora = require("ora");
 const TOKEN_PATH = "./token.json"
 const DOWNLOAD_FOLDER = "./GooglePhotosBackup"
-/*
-const SCOPES = ["https://www.googleapis.com/auth/photoslibrary.readonly"];
-const TOKEN_PATH = process.env.TOKEN_PATH || "./token.json";
-const DOWNLOAD_FOLDER = process.env.DOWNLOAD_FOLDER || "./GooglePhotosBackup";
+const port = 4000;
+const oauth2Client = new google.auth.OAuth2(client_id, client_secret, `http://localhost:${port}/auth`);
+let photos;
+let count = 0;
+
+(async () => {
+    try {
+        await authenticate();
+        let pageToken;
+        do {
+            const response = await photos.mediaItems.list(10, pageToken);
+            if (response.mediaItems) {
+                await downloadMedia(response.mediaItems);
+            }
+            pageToken = response.nextPageToken;
+        } while (pageToken);
+        process.exit(1);
+    } catch (error) {
+        console.log(error);
+        process.exit(0);
+    }
+})();
 
 async function authenticate() {
-    const auth = new google.auth.OAuth2(
-        "YOUR_CLIENT_ID",
-        "YOUR_CLIENT_SECRET",
-        "http://localhost"
-    );
-
-    if (fs.existsSync(TOKEN_PATH)) {
-        auth.setCredentials(JSON.parse(fs.readFileSync(TOKEN_PATH, "utf8")));
-        return auth;
+    let auth;
+    try {
+        auth = oauth2Client.setCredentials(JSON.parse(fs.readFileSync(TOKEN_PATH, "utf8")));
+        photos = new Photos(oauth2Client.credentials.access_token);
+    } catch (error) {
+        console.log(error);
+        process.exit(0);
     }
-
-    const authUrl = auth.generateAuthUrl({ access_type: "offline", scope: SCOPES });
-    console.log(`Перейди по ссылке для авторизации: ${authUrl}`);
-    await open(authUrl);
-
-    const { code } = await new Promise((resolve) => {
-        process.stdin.once("data", (data) => resolve({ code: data.toString().trim() }));
-    });
-
-    const { tokens } = await auth.getToken(code);
-    fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
-    auth.setCredentials(tokens);
-
     return auth;
-}
-
-async function listMedia(auth) {
-    const service = google.photoslibrary({ version: "v1", auth });
-    let mediaItems = [];
-    let nextPageToken = null;
-
-    console.log("📸 Загружаем список фото...");
-    do {
-        const response = await service.mediaItems.list({ pageSize: 100, pageToken: nextPageToken });
-        mediaItems = mediaItems.concat(response.data.mediaItems || []);
-        nextPageToken = response.data.nextPageToken;
-    } while (nextPageToken);
-
-    return mediaItems;
 }
 
 async function downloadMedia(mediaItems) {
     await fs.ensureDir(DOWNLOAD_FOLDER);
     const spinner = ora("Скачивание фото...").start();
-
     for (const item of mediaItems) {
+        console.log(item.mediaMetadata);
         const url = `${item.baseUrl}=d`; // Полный размер
         const filename = `${DOWNLOAD_FOLDER}/${item.filename}`;
         const response = await axios.get(url, { responseType: "stream" });
         response.data.pipe(fs.createWriteStream(filename));
-        await new Promise((resolve) => response.data.on("end", resolve));
+        await new Promise((resolve) => response.data.on("end", async () => {
+            // Пытался прикрутить удаление фоток, но это допустимо только в альбомах.
+            // При этом, как я понял, из альбома удаляется, но сам файл остаётся.
+            // Пока удаляем вручную: удерживая Shift выделяем первую и последнюю фотку и жмём удалить - по-моему это единственный способ массового удаления.
+            //await photos.albums.batchRemoveMediaItems({ mediaItemIds: [item.id] } );
+            count++;
+            resolve();
+        }));
     }
-
     spinner.succeed("✅ Все фото скачаны!");
+    console.log("Количество файлов:", count);
 }
-
-(async () => {
-    const auth = await authenticate();
-    const mediaItems = await listMedia(auth);
-    await downloadMedia(mediaItems);
-})();
-*/
